@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2" xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2" xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2" xmlns:ds="http://www.w3.org/2000/09/xmldsig#" xmlns:ext="urn:oasis:names:specification:ubl:schema:xsd:CommonExtensionComponents-2" xmlns:sts="dian:gov:co:facturaelectronica:Structures-2-1" xmlns:xades="http://uri.etsi.org/01903/v1.3.2#" xmlns:xades141="http://uri.etsi.org/01903/v1.4.1#" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2     http://docs.oasis-open.org/ubl/os-UBL-2.1/xsd/maindoc/UBL-Invoice-2.1.xsd">
+    <cbc:UBLVersionID>UBL 2.1</cbc:UBLVersionID>
+    <cbc:CustomizationID>10</cbc:CustomizationID>
+    <cbc:ProfileID>DIAN 2.1: Factura Electrónica de Venta</cbc:ProfileID>
+    <cbc:ProfileExecutionID>1</cbc:ProfileExecutionID>
+    <cbc:ID>SETP990000001</cbc:ID>
+    <cbc:UUID schemeName="CUFE-SHA384">a5f02548074d3209559c76a920252136e0d37e351859e9a16518175f75168532185d5641473215867165842154863215</cbc:UUID>
+    <cbc:IssueDate>2023-10-27</cbc:IssueDate>
+    <cbc:IssueTime>10:30:00-05:00</cbc:IssueTime>
+    <cbc:InvoiceTypeCode>01</cbc:InvoiceTypeCode>
+    <cbc:Note>Factura de Prueba Sistema Híbrido</cbc:Note>
+    <cbc:DocumentCurrencyCode>COP</cbc:DocumentCurrencyCode>
+    
+    <cac:AccountingSupplierParty>
+        <cac:Party>
+            <cac:PartyName>
+                <cbc:Name>Supermercado El Éxito Testing</cbc:Name>
+            </cac:PartyName>
+            <cac:PartyTaxScheme>
+                <cbc:RegistrationName>ALMACENES EXITO S.A.</cbc:RegistrationName>
+            </cac:PartyTaxScheme>
+        </cac:Party>
+    </cac:AccountingSupplierParty>
+    
+    <cac:LegalMonetaryTotal>
+        <cbc:LineExtensionAmount currencyID="COP">45000.00</cbc:LineExtensionAmount>
+        <cbc:TaxInclusiveAmount currencyID="COP">45000.00</cbc:TaxInclusiveAmount>
+        <cbc:PayableAmount currencyID="COP">45000.00</cbc:PayableAmount>
+    </cac:LegalMonetaryTotal>
+    
+    <cac:InvoiceLine>
+        <cbc:ID>1</cbc:ID>
+        <cbc:InvoicedQuantity unitCode="EA">1.000000</cbc:InvoicedQuantity>
+        <cbc:LineExtensionAmount currencyID="COP">5000.00</cbc:LineExtensionAmount>
+        <cac:Item>
+            <cbc:Description>Leche Deslactosada 1L</cbc:Description>
+            <cac:StandardItemIdentification>
+                <cbc:ID schemeID="999">001</cbc:ID>
+            </cac:StandardItemIdentification>
+        </cac:Item>
+    </cac:InvoiceLine>
+    
+    <cac:InvoiceLine>
+        <cbc:ID>2</cbc:ID>
+        <cbc:InvoicedQuantity unitCode="EA">2.000000</cbc:InvoicedQuantity>
+        <cbc:LineExtensionAmount currencyID="COP">20000.00</cbc:LineExtensionAmount>
+        <cac:Item>
+            <cbc:Description>Carne de Res Molida</cbc:Description>
+        </cac:Item>
+    </cac:InvoiceLine>
+    
+    <cac:InvoiceLine>
+        <cbc:ID>3</cbc:ID>
+        <cbc:InvoicedQuantity unitCode="EA">1.000000</cbc:InvoicedQuantity>
+        <cbc:LineExtensionAmount currencyID="COP">20000.00</cbc:LineExtensionAmount>
+        <cac:Item>
+            <cbc:Description>Producto Desconocido XYZ</cbc:Description>
+        </cac:Item>
+    </cac:InvoiceLine>
+</Invoice>

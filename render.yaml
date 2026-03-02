@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: tracker-financiero-backend
+    env: node
+    plan: free
+    region: ohio
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_VERSION
+        value: 20.11.0

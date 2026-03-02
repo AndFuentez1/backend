@@ -1,0 +1,188 @@
+{
+    "name": "Procesador Facturas Cloud Híbrido",
+    "nodes": [
+        {
+            "parameters": {
+                "pollTimes": {
+                    "item": [
+                        {
+                            "mode": "everyMinute"
+                        }
+                    ]
+                },
+                "simple": false,
+                "filters": {
+                    "q": "has:attachment filename:xml"
+                },
+                "options": {
+                    "downloadAttachments": true
+                }
+            },
+            "name": "Gmail Trigger",
+            "type": "n8n-nodes-base.gmailTrigger",
+            "typeVersion": 1,
+            "position": [
+                240,
+                300
+            ],
+            "credentials": {
+                "gmailOAuth2": {
+                    "id": "YOUR_GMAIL_CREDS_ID",
+                    "name": "Gmail account"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "jsCode": "// Iterar sobre todos los adjuntos (binarios)\nconst results = [];\n\nfor (const item of $input.all()) {\n  if (item.binary) {\n    for (const key of Object.keys(item.binary)) {\n      const file = item.binary[key];\n      // Filtrar solo XML (ignorando mayusculas/minusculas)\n      if (file.fileName && file.fileName.toLowerCase().endsWith('.xml')) {\n        results.push({\n          json: {\n            fileName: file.fileName\n          },\n          binary: {\n            data: file\n          }\n        });\n      }\n    }\n  }\n}\n\nreturn results;"
+            },
+            "name": "Filtrar solo XML",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                460,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "https://trackerfinanciero.onrender.com/api/webhook/secure-token",
+                "authentication": "none",
+                "sendBody": true,
+                "bodyParameters": {
+                    "parameters": [
+                        {
+                            "name": "xml_base64",
+                            "value": "={{ $binary.data.data }}"
+                        },
+                        {
+                            "name": "filename",
+                            "value": "={{ $binary.data.fileName }}"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "name": "Enviar a Backend Híbrido",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 3,
+            "position": [
+                680,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "conditions": {
+                    "boolean": [
+                        {
+                            "value1": "={{ $json.success }}",
+                            "value2": true
+                        }
+                    ]
+                }
+            },
+            "name": "Verificar Éxito",
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 1,
+            "position": [
+                900,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "subject": "✅ Factura Procesada: {{ $json.data.establecimiento }}",
+                "message": "Total: ${{ $json.data.total }}\nProductos: {{ $json.data.productos_procesados }}",
+                "toEmail": "tu-email@gmail.com"
+            },
+            "name": "Email Éxito",
+            "type": "n8n-nodes-base.emailSend",
+            "typeVersion": 2,
+            "position": [
+                1120,
+                200
+            ],
+            "credentials": {
+                "smtp": {
+                    "id": "YOUR_SMTP_ID",
+                    "name": "Gmail SMTP"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "subject": "❌ Error Procesando Factura",
+                "message": "Error: {{ $json.error }}",
+                "toEmail": "tu-email@gmail.com"
+            },
+            "name": "Email Error",
+            "type": "n8n-nodes-base.emailSend",
+            "typeVersion": 2,
+            "position": [
+                1120,
+                400
+            ],
+            "credentials": {
+                "smtp": {
+                    "id": "YOUR_SMTP_ID",
+                    "name": "Gmail SMTP"
+                }
+            }
+        }
+    ],
+    "connections": {
+        "Gmail Trigger": {
+            "main": [
+                [
+                    {
+                        "node": "Filtrar solo XML",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Filtrar solo XML": {
+            "main": [
+                [
+                    {
+                        "node": "Enviar a Backend Híbrido",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Enviar a Backend Híbrido": {
+            "main": [
+                [
+                    {
+                        "node": "Verificar Éxito",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Verificar Éxito": {
+            "main": [
+                [
+                    {
+                        "node": "Email Éxito",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Email Error",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    }
+}
