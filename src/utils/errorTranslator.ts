@@ -32,8 +32,7 @@ export function translateErrorMessage(error: unknown) {
     if (!error) {
         return 'Error desconocido';
     }
-
-    const message = typeof error === 'string' ? error : (error.message || String(error));
+    const message = typeof error === 'string' ? error : (error instanceof Error ? error.message : String(error));
 
     // Buscar coincidencias exactas o parciales
     for (const [english, spanish] of Object.entries(ERROR_TRANSLATIONS)) {

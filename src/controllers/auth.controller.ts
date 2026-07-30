@@ -117,7 +117,24 @@ export async function initiateOAuth(req: Request, res: Response) {
     // Generar URL de autenticación con userId en state (Base64 para mayor seguridad en transporte)
     const stateData = { userId, email };
     const state = Buffer.from(JSON.stringify(stateData)).toString('base64');
-    const gmailService = new GmailService();
+
+    // Get dynamic redirect URI if running on Render / production domain but config points to localhost
+    const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+    const host = req.get('host');
+    const dynamicBackendUrl = `${protocol}://${host}`;
+    
+    let customRedirectUri: string | undefined;
+    const envRedirectUri = process.env.GMAIL_REDIRECT_URI;
+    const isProductionHost = host && (host.includes('onrender.com') || (!host.includes('localhost') && !host.includes('127.0.0.1')));
+    
+    if (isProductionHost) {
+        if (!envRedirectUri || envRedirectUri.includes('localhost') || envRedirectUri.includes('127.0.0.1')) {
+            customRedirectUri = `${dynamicBackendUrl}/auth/google/callback`;
+            logger.info(`🔄 Detectado entorno producción. Corrigiendo GMAIL_REDIRECT_URI local a dinámico: ${customRedirectUri}`);
+        }
+    }
+
+    const gmailService = new GmailService(customRedirectUri);
     const authUrl = gmailService.getAuthUrl(state, {
       prompt: 'consent', // Always force consent to ensure refresh_token
       includeGrantedScopes: true,
@@ -167,8 +184,24 @@ export async function handleOAuthCallback(req: Request, res: Response) {
 
     logger.info(`🔑 Intercambiando código por tokens para usuario ${userId}...`);
 
+    // Get dynamic redirect URI if running on Render / production domain but config points to localhost
+    const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+    const host = req.get('host');
+    const dynamicBackendUrl = `${protocol}://${host}`;
+    
+    let customRedirectUri: string | undefined;
+    const envRedirectUri = process.env.GMAIL_REDIRECT_URI;
+    const isProductionHost = host && (host.includes('onrender.com') || (!host.includes('localhost') && !host.includes('127.0.0.1')));
+    
+    if (isProductionHost) {
+        if (!envRedirectUri || envRedirectUri.includes('localhost') || envRedirectUri.includes('127.0.0.1')) {
+            customRedirectUri = `${dynamicBackendUrl}/auth/google/callback`;
+            logger.info(`🔄 Detectado entorno producción en callback. Corrigiendo GMAIL_REDIRECT_URI local a dinámico: ${customRedirectUri}`);
+        }
+    }
+
     // Intercambiar código por tokens usando GmailService
-    const gmailService = new GmailService();
+    const gmailService = new GmailService(customRedirectUri);
     const tokens = await gmailService.setCredentials(code);
 
     // Asegurar que existe el registro de user_config

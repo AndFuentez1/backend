@@ -177,6 +177,63 @@ export async function deletePendingByMessageId(messageId: string, userId: string
     }
 }
 
+export async function checkDuplicateLoanMessage(messageId: string, userId: string): Promise<boolean> {
+    try {
+        if (!messageId || !userId) {
+            return false;
+        }
+        const { data, error } = await supabase
+            .from('loans')
+            .select('id')
+            .eq('user_id', userId)
+            .eq('source_message_id', messageId)
+            .limit(1);
+        if (error) {
+            throw error;
+        }
+        return Boolean(data && data.length > 0);
+    } catch (error) {
+        logger.error('❌ Error verificando préstamo duplicado:', error);
+        return false;
+    }
+}
+
+export async function insertLoanDraft(loanData: {
+    user_id: string;
+    name: string;
+    total_amount: number;
+    type: 'borrowed' | 'lent';
+    interest_rate?: number;
+    due_date?: string | null;
+    payment_method_id?: string | null;
+    is_disbursed?: boolean;
+    installments?: number | null;
+    source_message_id?: string | null;
+}) {
+    try {
+        const payload = {
+            interest_rate: 0,
+            due_date: null,
+            payment_method_id: null,
+            is_disbursed: true,
+            installments: null,
+            ...loanData,
+        };
+        const { data, error } = await supabase
+            .from('loans')
+            .insert(payload)
+            .select()
+            .single();
+        if (error) {
+            throw error;
+        }
+        return data;
+    } catch (error) {
+        logger.error('❌ Error insertando préstamo:', error);
+        throw error;
+    }
+}
+
 
 /**
  * Inserta una factura en pending_invoices

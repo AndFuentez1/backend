@@ -47,6 +47,7 @@ Analyze the following purchase record and classify it into ONE category.
 
 **Purchase Information:**
 - Store: ${invoiceData.tienda}
+- Subject: ${invoiceData.subject || 'N/A'}
 - Date: ${invoiceData.fecha}
 - Products: ${invoiceData.productNames}
 - Total: $${invoiceData.total}
@@ -55,7 +56,7 @@ Analyze the following purchase record and classify it into ONE category.
 ${VALID_CATEGORIES.join(', ')}
 
 **Instructions:**
-1. Analyze the products and store name
+1. Analyze the products, store name, and subject
 2. Choose the MOST APPROPRIATE category from the list above
 3. If there's not enough information, use "Otros"
 4. Provide a brief reasoning for your choice (in Spanish)
