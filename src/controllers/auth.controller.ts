@@ -309,7 +309,24 @@ export async function handleOAuthCallback(req: Request, res: Response) {
     `);
   } catch (error: unknown) {
     logger.error('❌ Error en callback OAuth:', error);
-    const errMessage = error instanceof Error ? error.message : 'Ocurrió un error inesperado al conectar con Gmail.';
+
+    let errMessage = 'Ocurrió un error inesperado al conectar con Gmail.';
+    if (error instanceof Error && error.message) {
+      errMessage = error.message;
+    } else if (typeof error === 'object' && error !== null) {
+      const maybeErr = error as {
+        message?: string;
+        response?: { data?: { error?: string; error_description?: string } };
+      };
+      if (maybeErr.response?.data?.error_description) {
+        errMessage = `${maybeErr.response.data.error || 'Error'}: ${maybeErr.response.data.error_description}`;
+      } else if (maybeErr.response?.data?.error) {
+        errMessage = maybeErr.response.data.error;
+      } else if (typeof maybeErr.message === 'string' && maybeErr.message.trim().length > 0) {
+        errMessage = maybeErr.message;
+      }
+    }
+
     res.status(500).send(renderErrorPage(errMessage));
   }
 }
