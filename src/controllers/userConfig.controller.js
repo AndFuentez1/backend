@@ -59,8 +59,7 @@ export async function saveTelegramConfiguration(req, res) {
         if (error?.code === 'EMAIL_REQUIRED') {
             return res.status(400).json({ error: 'email requerido para crear configuración de usuario' });
         }
-        const message = error?.message ? `Error guardando configuración: ${error.message}` : 'Error guardando configuración';
-        res.status(500).json({ error: message, details: error?.details || null });
+        res.status(500).json({ error: 'Error guardando configuración' });
     }
 }
 

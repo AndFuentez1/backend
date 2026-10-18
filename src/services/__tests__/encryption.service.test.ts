@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { encrypt, decrypt, encryptJSON, decryptJSON } from '../encryption.service.js';
+import crypto from 'crypto';
+import { encrypt, decrypt, encryptJSON, decryptJSON, isLegacyCiphertext } from '../encryption.service.js';
 
 describe('encryption.service', () => {
     const testUserId = 'user-12345-abcde';
@@ -53,5 +54,33 @@ describe('encryption.service', () => {
 
     it('should throw error when decrypting invalid formatted string', async () => {
         await expect(decrypt('invalidformatwithoutcolon', testUserId)).rejects.toThrow();
+    });
+
+    it('should produce authenticated v2 (GCM) ciphertexts', async () => {
+        const encrypted = await encrypt(sampleText, testUserId);
+        expect(encrypted.startsWith('v2:')).toBe(true);
+        expect(isLegacyCiphertext(encrypted)).toBe(false);
+    });
+
+    it('should reject tampered v2 ciphertexts', async () => {
+        const encrypted = await encrypt(sampleText, testUserId);
+        const parts = encrypted.split(':');
+        const data = parts[3];
+        parts[3] = (data[0] === 'a' ? 'b' : 'a') + data.slice(1);
+        await expect(decrypt(parts.join(':'), testUserId)).rejects.toThrow();
+    });
+
+    it('should still decrypt legacy v1 (CBC) ciphertexts', async () => {
+        const key = crypto.scryptSync(
+            process.env.ENCRYPTION_KEY || 'default-key-change-in-production-32ch',
+            testUserId,
+            32
+        );
+        const iv = crypto.randomBytes(16);
+        const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
+        const legacy = `${iv.toString('hex')}:${cipher.update(sampleText, 'utf8', 'hex')}${cipher.final('hex')}`;
+
+        expect(isLegacyCiphertext(legacy)).toBe(true);
+        await expect(decrypt(legacy, testUserId)).resolves.toBe(sampleText);
     });
 });

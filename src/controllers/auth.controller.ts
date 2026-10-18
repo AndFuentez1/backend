@@ -2,8 +2,18 @@ import type { Request, Response } from 'express';
 import { GmailService } from '../services/gmail.service.ts';
 import { saveGmailTokens, ensureUserConfig, loadGmailTokens } from '../services/userConfig.service.js';
 import logger from '../utils/logger.js';
+import {
+  escapeHtml,
+  getOAuthStateSecret,
+  isAllowedOrigin,
+  signOAuthState,
+  toScriptLiteral,
+  verifyOAuthState,
+} from '../utils/oauthState.ts';
 
-const renderErrorPage = (message: string) => `
+const renderErrorPage = (rawMessage: string, targetOrigin: string | null = null) => {
+  const message = escapeHtml(rawMessage);
+  return `
   <!DOCTYPE html>
   <html>
   <head>
@@ -88,15 +98,16 @@ const renderErrorPage = (message: string) => `
       <button class="btn" onclick="window.close()">Cerrar Ventana</button>
     </div>
     <script>
-      if (window.opener) {
-        window.opener.postMessage({ type: 'GMAIL_ERROR', error: '${message}' }, '*');
+      const targetOrigin = ${toScriptLiteral(targetOrigin)};
+      if (window.opener && targetOrigin) {
+        window.opener.postMessage({ type: 'GMAIL_ERROR', error: ${toScriptLiteral(rawMessage)} }, targetOrigin);
       }
     </script>
   </body>
   </html>
 `;
+};
 
-/**
 /**
  * Determina de forma consistente y determinística la URI de redirección de OAuth
  */
@@ -112,6 +123,9 @@ function getCanonicalRedirectUri(req: Request): string {
   }
 
   const host = req.get('host') || '';
+  if (!host) {
+    throw new Error('No se pudo determinar el host para la URI de redirección de OAuth');
+  }
   const isProductionHost = host.includes('onrender.com') || (!host.includes('localhost') && !host.includes('127.0.0.1'));
   
   if (isProductionHost) {
@@ -122,29 +136,46 @@ function getCanonicalRedirectUri(req: Request): string {
 }
 
 /**
- * Inicia el flujo de OAuth2 para un usuario específico
+ * Crea un enlace de OAuth firmado para el usuario autenticado (JWT).
+ * La identidad sale del token verificado, nunca del cliente.
+ */
+export async function createOAuthLink(req: Request, res: Response) {
+  try {
+    const authUser = (req as Request & { authUser?: { id: string; email: string | null } }).authUser;
+    if (!authUser?.id || !authUser.email) {
+      return res.status(401).json({ error: 'No autenticado' });
+    }
+
+    const requestedOrigin = typeof req.body?.origin === 'string' ? req.body.origin : null;
+    const state = signOAuthState(
+      { userId: authUser.id, email: authUser.email, origin: isAllowedOrigin(requestedOrigin) ? requestedOrigin : null },
+      getOAuthStateSecret()
+    );
+
+    res.json({ state });
+  } catch (error: unknown) {
+    logger.error('❌ Error creando enlace OAuth:', error);
+    res.status(500).json({ error: 'No se pudo iniciar la conexión con Google' });
+  }
+}
+
+/**
+ * Inicia el flujo de OAuth2: exige un `state` firmado emitido por createOAuthLink
  */
 export async function initiateOAuth(req: Request, res: Response) {
   try {
-    const { userId, email } = req.query;
+    const { state } = req.query;
 
-    if (!userId || typeof userId !== 'string') {
-      return res.status(400).send(renderErrorPage('ID de usuario no recibido. Por favor, asegúrate de estar logueado.'));
+    if (!state || typeof state !== 'string') {
+      return res.status(400).send(renderErrorPage('Solicitud de conexión inválida. Vuelve a intentarlo desde la configuración.'));
     }
 
-    if (!email || typeof email !== 'string') {
-      return res.status(400).send(renderErrorPage('Email de usuario no recibido. Por favor, intenta de nuevo.'));
+    const payload = verifyOAuthState(state, getOAuthStateSecret());
+    if (!payload) {
+      return res.status(400).send(renderErrorPage('El enlace de conexión es inválido o expiró. Vuelve a intentarlo desde la configuración.'));
     }
-
-    const existingTokens = await loadGmailTokens(userId);
-
-    // Generar URL de autenticación con userId en state (Base64 para mayor seguridad en transporte)
-    const stateData = { userId, email };
-    const state = Buffer.from(JSON.stringify(stateData)).toString('base64');
 
     const canonicalRedirectUri = getCanonicalRedirectUri(req);
-    logger.info(`🔄 Usando Redirect URI canónica: ${canonicalRedirectUri}`);
-
     const gmailService = new GmailService(canonicalRedirectUri);
     const authUrl = gmailService.getAuthUrl(state, {
       prompt: 'consent', // Always force consent to ensure refresh_token
@@ -152,7 +183,8 @@ export async function initiateOAuth(req: Request, res: Response) {
       accessType: 'offline'
     });
 
-    logger.info(`🔐 Redirigiendo a Google OAuth para usuario ${userId}. URL: ${authUrl}`);
+    // No se registra la URL completa (contiene el state firmado)
+    logger.info(`🔐 Redirigiendo a Google OAuth para usuario ${payload.userId}`);
     res.redirect(authUrl);
   } catch (error: unknown) {
     logger.error('❌ Error iniciando OAuth:', error);
@@ -166,6 +198,7 @@ export async function initiateOAuth(req: Request, res: Response) {
 export async function handleOAuthCallback(req: Request, res: Response) {
   try {
     const { code, state } = req.query;
+    let stateOrigin: string | null = null;
 
     if (!code || typeof code !== 'string') {
       logger.warn(`⚠️ Callback OAuth sin código. Query: ${JSON.stringify(req.query)}`);
@@ -174,24 +207,17 @@ export async function handleOAuthCallback(req: Request, res: Response) {
 
     if (!state || typeof state !== 'string') {
       logger.warn(`⚠️ Callback OAuth sin state. Query: ${JSON.stringify(req.query)}`);
-      return res.status(400).send(renderErrorPage(`Error de seguridad: El parámetro 'state' de Google se perdió. (Recibidos: ${Object.keys(req.query).join(', ')})`));
+      return res.status(400).send(renderErrorPage("Error de seguridad: falta el parámetro 'state' en la respuesta de Google."));
     }
 
     // Parsear state para obtener userId y email
-    let userId: string, email: string;
-    try {
-      const decodedState = Buffer.from(state, 'base64').toString();
-      const parsedState = JSON.parse(decodedState);
-      userId = parsedState.userId;
-      email = parsedState.email;
-    } catch (e) {
-      logger.error('❌ Error parseando state OAuth:', e);
-      return res.status(400).send(renderErrorPage('El estado de la sesión es inválido o ha sido alterado.'));
+    const verifiedState = verifyOAuthState(state, getOAuthStateSecret());
+    if (!verifiedState) {
+      logger.warn('⚠️ State OAuth inválido o expirado en callback');
+      return res.status(400).send(renderErrorPage('El estado de la sesión es inválido, expiró o ha sido alterado.'));
     }
-
-    if (!email || !userId) {
-      return res.status(400).send(renderErrorPage('No se pudo identificar al usuario. Por favor, intenta de nuevo desde la configuración.'));
-    }
+    const { userId, email } = verifiedState;
+    stateOrigin = verifiedState.origin;
 
     logger.info(`🔑 Intercambiando código por tokens para usuario ${userId}...`);
 
@@ -299,8 +325,9 @@ export async function handleOAuthCallback(req: Request, res: Response) {
           <button class="btn" onclick="window.close()">Cerrar</button>
         </div>
         <script>
-          if (window.opener) {
-            window.opener.postMessage({ type: 'GMAIL_CONNECTED', status: 'success' }, '*');
+          const targetOrigin = ${toScriptLiteral(stateOrigin)};
+          if (window.opener && targetOrigin) {
+            window.opener.postMessage({ type: 'GMAIL_CONNECTED', status: 'success' }, targetOrigin);
             setTimeout(() => window.close(), 1500);
           }
         </script>
@@ -327,7 +354,7 @@ export async function handleOAuthCallback(req: Request, res: Response) {
       }
     }
 
-    res.status(500).send(renderErrorPage(errMessage));
+    res.status(500).send(renderErrorPage(errMessage, stateOrigin));
   }
 }
 

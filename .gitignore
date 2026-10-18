@@ -26,3 +26,12 @@ Thumbs.db
 # Testing
 coverage/
 .nyc_output/
+
+# Variables de entorno (incluidos los ejemplos): no se versionan
+.env*
+
+# Herramientas de IA / editores
+.claude/
+.serena/
+.cursor/
+CLAUDE.md

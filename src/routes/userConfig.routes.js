@@ -1,4 +1,6 @@
 import express from 'express';
+import supabase from '../config/supabase.config.js';
+import { createRequireAuth } from '../middleware/requireAuth.js';
 import {
     saveGeminiConfig,
     saveTelegramConfiguration,
@@ -11,6 +13,9 @@ import {
 } from '../controllers/userConfig.controller.js';
 
 const router = express.Router();
+
+// Todas las rutas requieren sesión válida: el userId se toma del JWT, no del cliente
+router.use(createRequireAuth((token) => supabase.auth.getUser(token)));
 
 // Guardar Gemini API Key
 router.post('/gemini', saveGeminiConfig);

@@ -10,7 +10,8 @@ import { errorHandler } from './src/middleware/errorHandler.js';
 import logger from './src/utils/logger.js';
 
 const app = express();
-app.set('trust proxy', true);
+// Render termina TLS en un único proxy: confiar solo en 1 salto evita falsificar X-Forwarded-*
+app.set('trust proxy', 1);
 const PORT = process.env.PORT || 3001;
 
 // Middleware
@@ -18,14 +19,18 @@ const allowedOrigins = [
     'http://localhost:8080',
     'http://localhost:8081',
     'http://localhost:5173',
-    'https://andfuentez1.github.io'
+    'https://andfuentez1.github.io',
+    // App móvil (Capacitor WebView en Android / iOS)
+    'https://localhost',
+    'capacitor://localhost'
 ];
 
 app.use(cors({
     origin: function (origin, callback) {
         // Permitir peticiones sin origen (como apps móviles o curl)
         if (!origin) return callback(null, true);
-        if (allowedOrigins.indexOf(origin) !== -1 || origin.endsWith('.github.io')) {
+        // Solo orígenes explícitos: `endsWith('.github.io')` aceptaba páginas de cualquier usuario
+        if (allowedOrigins.indexOf(origin) !== -1) {
             callback(null, true);
         } else {
             callback(new Error('Not allowed by CORS'));
