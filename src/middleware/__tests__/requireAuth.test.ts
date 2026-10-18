@@ -1,5 +1,4 @@
 import { describe, it, expect, vi } from 'vitest';
-// @ts-expect-error módulo JS sin tipos
 import { createRequireAuth } from '../requireAuth.js';
 
 type MockRes = {

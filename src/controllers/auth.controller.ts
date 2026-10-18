@@ -196,9 +196,10 @@ export async function initiateOAuth(req: Request, res: Response) {
  * Callback de OAuth2 - recibe el código y lo intercambia por tokens
  */
 export async function handleOAuthCallback(req: Request, res: Response) {
+  // Fuera del try: el catch lo usa para dirigir el postMessage de error a la ventana correcta
+  let stateOrigin: string | null = null;
   try {
     const { code, state } = req.query;
-    let stateOrigin: string | null = null;
 
     if (!code || typeof code !== 'string') {
       logger.warn(`⚠️ Callback OAuth sin código. Query: ${JSON.stringify(req.query)}`);

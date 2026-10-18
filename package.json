@@ -8,6 +8,7 @@
         "start": "tsx server.js",
         "dev": "nodemon -e js,ts,json --exec tsx server.js",
         "build": "echo 'No build step required'",
+        "typecheck": "tsc -p tsconfig.json",
         "test": "vitest run",
         "test:watch": "vitest"
     },
